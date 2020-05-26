@@ -1,19 +1,13 @@
-from itertools               import combinations
+from itertools import combinations
+
 import numpy as np
 
-try:
-    from .cluster import Cluster
-    from .cross_correlation_graph import CrossCorrelationGraph
-    from .fingerprint import Fingerprint
-except:
-    try:
-        from cluster import Cluster
-        from cross_correlation_graph import CrossCorrelationGraph
-        from fingerprint import Fingerprint
-    except Exception as e:
-        raise ValueError(e)
+from .cluster import Cluster
+from .cross_correlation_graph import CrossCorrelationGraph
+from .fingerprint import Fingerprint
 
-class FingerprintGenerator(object):
+
+class FingerprintGenerator:
     """Generator of FlowPrint Fingerprint objects from flows
 
         Attributes
@@ -49,10 +43,10 @@ class FingerprintGenerator(object):
                 Threshold for the minimum required similarity
             """
         # Set FlowPrint parameters
-        self.batch       = batch
-        self.window      = window
+        self.batch = batch
+        self.window = window
         self.correlation = correlation
-        self.similarity  = similarity
+        self.similarity = similarity
 
     ########################################################################
     #                          Fit-Predict method                          #
@@ -100,9 +94,7 @@ class FingerprintGenerator(object):
         sort_batch = np.array([x.time_start for x in X])
         # Compute number of required batches
         if sort_batch.shape[0]:
-            batches = int(
-                np.ceil((max(sort_batch) - min(sort_batch)) / self.batch)
-            )
+            batches = int(np.ceil((max(sort_batch) - min(sort_batch)) / self.batch))
         else:
             batches = 0
         # Get edges of batches
@@ -137,7 +129,6 @@ class FingerprintGenerator(object):
         # Return result
         return result[sort_orig]
 
-
     def _fit_single_batch_(self, X, y=None):
         """Create fingerprints for a given batch of flows.
 
@@ -166,14 +157,17 @@ class FingerprintGenerator(object):
 
         # Find cliques in clusters
         cliques = CrossCorrelationGraph(
-                    window      = self.window,     # Set window size
-                    correlation = self.correlation # Set correlation threshold
-                  ).fit_predict(cluster)           # Get cliques
+            window=self.window,  # Set window size
+            correlation=self.correlation,  # Set correlation threshold
+        ).fit_predict(
+            cluster
+        )  # Get cliques
 
         # Transform cliques to fingerprints
         fingerprints = list(
-            Fingerprint(c)                 # Cast to fingerprint
-            for c in cliques if len(c) > 1 # Only select cliques > 1
+            Fingerprint(c)  # Cast to fingerprint
+            for c in cliques
+            if len(c) > 1  # Only select cliques > 1
         )
 
         ####################################################################
@@ -181,8 +175,8 @@ class FingerprintGenerator(object):
         ####################################################################
 
         # Get network destination per flow
-        destinations = cluster.predict(X)     # Get destination id per flow
-        translation  = cluster.cluster_dict() # Get destinations for each id
+        destinations = cluster.predict(X)  # Get destination id per flow
+        translation = cluster.cluster_dict()  # Get destinations for each id
         destinations = [translation.get(d) for d in destinations]
 
         # Get fingerprint per network destination
@@ -193,11 +187,15 @@ class FingerprintGenerator(object):
                 mapping_fingerprints[destination] = fingerprint
 
         # Apply mapping
-        prediction = np.array([
-            mapping_fingerprints.get(x.destination,
-            mapping_fingerprints.get(x.certificate,
-            Fingerprint())) for x in X
-        ])
+        prediction = np.array(
+            [
+                mapping_fingerprints.get(
+                    x.destination,
+                    mapping_fingerprints.get(x.certificate, Fingerprint()),
+                )
+                for x in X
+            ]
+        )
 
         ####################################################################
         #             Handle unknown and similar fingerprints              #
@@ -251,7 +249,7 @@ class FingerprintGenerator(object):
 
         # Get blocks of unassigned fingerprint indices
         blocks = list()
-        block  = list()
+        block = list()
         for i, fingerprint in enumerate(y):
             if fingerprint and block:
                 blocks.append(np.asarray(block))
@@ -265,23 +263,23 @@ class FingerprintGenerator(object):
         for block in blocks:
             # Get indices before and after block
             before = min(block) - 1
-            after  = max(block) + 1
+            after = max(block) + 1
             # Get timestamps before and after block
-            ts_before = X[before].time_start if before >= 0          else float('inf')
-            ts_after  = X[after ].time_start if after  <  X.shape[0] else float('inf')
+            ts_before = X[before].time_start if before >= 0 else float("inf")
+            ts_after = X[after].time_start if after < X.shape[0] else float("inf")
             # Get fingerprints before and after block
-            fp_before = y[before] if before >= 0          else Fingerprint()
-            fp_after  = y[after ] if after  <  X.shape[0] else Fingerprint()
+            fp_before = y[before] if before >= 0 else Fingerprint()
+            fp_after = y[after] if after < X.shape[0] else Fingerprint()
 
             # Assign new fingerprints per block
-            block_before = abs(timestamps[block] - ts_before) <\
-                           abs(timestamps[block] - ts_after )
-            y[block[ block_before]] = fp_before
+            block_before = abs(timestamps[block] - ts_before) < abs(
+                timestamps[block] - ts_after
+            )
+            y[block[block_before]] = fp_before
             y[block[~block_before]] = fp_after
 
         # Return fingerprints in original order
         return y[sort_orig]
-
 
     def merge_fingerprints(self, fingerprints, threshold=1):
         """Merge fingerprints based on similarity.
@@ -316,22 +314,23 @@ class FingerprintGenerator(object):
         ####################################################################
         elif threshold < 1:
             # Initialise fingerprinting pairs to merge
-            pairs = set([
-                # Define pairs
-                (fp1, fp2)
-                # For each combination of pairs
-                for fp1, fp2 in self.score_combinations(unique, threshold)
-                # Where similarity >= threshold
-                if fp1.compare(fp2) >= threshold
-            ])
+            pairs = set(
+                [
+                    # Define pairs
+                    (fp1, fp2)
+                    # For each combination of pairs
+                    for fp1, fp2 in self.score_combinations(unique, threshold)
+                    # Where similarity >= threshold
+                    if fp1.compare(fp2) >= threshold
+                ]
+            )
 
             # Create mapping of original fingerprint -> merged fingerprint
             mapping = dict()
             # Loop over all fingerprints to be merged
             for fp1, fp2 in pairs:
                 # Create merged fingerprint
-                fp_merged = mapping.get(fp1, fp1).merge(
-                            mapping.get(fp2, fp2))
+                fp_merged = mapping.get(fp1, fp1).merge(mapping.get(fp2, fp2))
                 # Set mappings
                 mapping[fp1] = fp_merged
                 mapping[fp2] = fp_merged
@@ -343,7 +342,6 @@ class FingerprintGenerator(object):
         #                    Return merged fingerprints                    #
         ####################################################################
         return result
-
 
     def score_combinations(self, fingerprints, threshold):
         """Generator for combinations of fingerprints where can be > threshold.
@@ -381,13 +379,14 @@ class FingerprintGenerator(object):
         # Get possible combinations of lengths
         for length, fingerprints in sorted(lengths.items()):
             # Skip length 0, they cannot be equal
-            if length == 0: continue
+            if length == 0:
+                continue
             # Initialise set of length combinations to explore
             length_comb = set()
             # Get length of possible next combination
             length2 = length
             # Check if score is possible
-            while (length2-length) / max(length2, 1) <= (1-threshold):
+            while (length2 - length) / max(length2, 1) <= (1 - threshold):
                 # Check if length is possible
                 if length2 in lengths:
                     # If both are possible, add length as combination
@@ -401,13 +400,9 @@ class FingerprintGenerator(object):
                     yield from combinations(lengths.get(length), 2)
                 # If lengths are not equal, return combinations between sets
                 else:
-                    a = lengths.get(length )
+                    a = lengths.get(length)
                     b = lengths.get(length2)
-                    yield from ((x,y) for x in a for y in b)
-
-
-
-
+                    yield from ((x, y) for x in a for y in b)
 
     def map(self, fingerprints_test, fingerprints_train, verbose=False):
         """Map training fingerprints to testing fingerprints.
@@ -430,7 +425,7 @@ class FingerprintGenerator(object):
             """
         # Get unique fingerprints
         fingerprints_train = np.unique(fingerprints_train)
-        fingerprints_test  = np.unique(fingerprints_test)
+        fingerprints_test = np.unique(fingerprints_test)
 
         # Create mappings
         mapping_train = dict()
@@ -449,7 +444,7 @@ class FingerprintGenerator(object):
 
             # Print progress if verbose
             if verbose:
-                print("{}/{}".format(i+1, fingerprints_test.shape[0]), end='\r')
+                print("{}/{}".format(i + 1, fingerprints_test.shape[0]), end="\r")
 
             # Initialise set
             matches = set()
@@ -498,7 +493,7 @@ class FingerprintGenerator(object):
             """
         # Get unique fingerprints
         fingerprints_train = np.unique(fingerprints_train)
-        fingerprints_test  = np.unique(fingerprints_test)
+        fingerprints_test = np.unique(fingerprints_test)
 
         # Create mappings
         mapping_train = dict()
@@ -517,7 +512,7 @@ class FingerprintGenerator(object):
 
             # Print progress if verbose
             if verbose:
-                print("{}/{}".format(i+1, fingerprints_test.shape[0]), end='\r')
+                print("{}/{}".format(i + 1, fingerprints_test.shape[0]), end="\r")
 
             # Initialise set
             matches = set()

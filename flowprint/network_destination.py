@@ -1,6 +1,7 @@
 from collections import Counter
 
-class NetworkDestination(object):
+
+class NetworkDestination:
     """NetworkDestination object for flow samples
 
         Attributes
@@ -21,7 +22,7 @@ class NetworkDestination(object):
             Labels related to NetworkDestination
     """
 
-    def __init__(self, identifier, samples=[]):
+    def __init__(self, identifier, samples=None):
         """NetworkDestination object for flow samples
 
             Parameters
@@ -34,19 +35,18 @@ class NetworkDestination(object):
                 Samples to store in this NetworkDestination.
             """
         # Initialise variables
-        self.identifier   = identifier
-        self.samples      = []
+
+        in_samples = samples or []
+
+        self.identifier = identifier
+        self.samples = []
         self.destinations = set()
         self.certificates = set()
-        self.labels       = Counter()
+        self.labels = Counter()
 
         # Add each datapoint
-        for X in samples:
+        for X in in_samples:
             self.add(X)
-
-    ########################################################################
-    #                         Add flows to cluster                         #
-    ########################################################################
 
     def add(self, X, y=None):
         """Add flow X to NetworkDestination object.
@@ -66,7 +66,6 @@ class NetworkDestination(object):
         self.destinations.add(X.destination)
         self.certificates.add(X.certificate)
 
-
     def merge(self, other):
         """Merge NetworkDestination with other NetworkDestination object.
 
@@ -84,31 +83,26 @@ class NetworkDestination(object):
             self.certificates |= other.certificates
             self.labels += other.labels
 
-    ########################################################################
-    #                           Get description                            #
-    ########################################################################
-
     def get_description(self):
         """Returns human readable description of cluster"""
         # Get descriptions
         descr_cert = [X.certificate for X in self.samples]
-        descr_ip   = ["{}".format(X.destination) for X in self.samples]
+        descr_ip = ["{}".format(X.destination) for X in self.samples]
         # Remove None values
         descr_cert = [x for x in descr_cert if x is not None]
-        descr_ip   = [x for x in descr_ip   if x is not None]
+        descr_ip = [x for x in descr_ip if x is not None]
         # Get most common
         descr_cert = Counter(descr_cert).most_common(1)
-        descr_ip   = Counter(descr_ip  ).most_common(1)
+        descr_ip = Counter(descr_ip).most_common(1)
         # Return description
-        try   : return descr_cert[0][0]
-        except: return descr_ip[0][0]
-
-    ########################################################################
-    #                           Object overrides                           #
-    ########################################################################
+        try:
+            return descr_cert[0][0]
+        except:
+            return descr_ip[0][0]
 
     def __str__(self):
         """Returns string presentation of self."""
-        return "NetworkDestination [{:4}] [size={:4}] [IPs={}] [labels={}]".\
-                format(self.identifier, len(self.samples),
-                list(sorted(self.destinations)), self.labels)
+        return (
+            "NetworkDestination [{self.identifier:4}] [size={len(self.samples):4}] "
+            "[IPs={list(sorted(self.destinations))}] [labels={self.labels}]"
+        )

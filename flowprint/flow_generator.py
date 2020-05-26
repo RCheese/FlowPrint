@@ -1,12 +1,7 @@
-try:
-    from .flows import Flow
-except:
-    try:
-        from flows import Flow
-    except Exception as e:
-        raise ValueError(e)
+from .flows import Flow
 
-class FlowGenerator(object):
+
+class FlowGenerator:
     """Generator for Flows from packets extraced using reader.Reader.read()"""
 
     def combine(self, packets):
@@ -22,14 +17,10 @@ class FlowGenerator(object):
             flows : dict
                 Dictionary of flow_key -> Flow()
             """
-        # Initialise result
         result = dict()
 
-        # For each packet, add it to a flow
         for packet in packets:
             key = (packet[0], packet[1], packet[2])
-            # Add packet to flow
             result[key] = result.get(key, Flow()).add(packet)
 
-        # Return result
         return result

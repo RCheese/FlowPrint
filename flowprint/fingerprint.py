@@ -26,7 +26,7 @@ class Fingerprint(frozenset):
         # Initialise attributes
         destinations = set()
         certificates = set()
-        n_flows      = 0
+        n_flows = 0
 
         # Retrieve attributes from NetworkDestinations
         for cluster in set(*args):
@@ -38,14 +38,9 @@ class Fingerprint(frozenset):
         self = super(Fingerprint, cls).__new__(cls, destinations | certificates)
 
         # Set number of flows
-        self.__setattr__('n_flows', n_flows)
+        self.__setattr__("n_flows", n_flows)
 
-        # Return frozenset
         return self
-
-    ########################################################################
-    #                         Comparison functions                         #
-    ########################################################################
 
     def merge(self, *other):
         """Merge fingerprint with other fingerprint(s)
@@ -65,7 +60,7 @@ class Fingerprint(frozenset):
         # Create new fingerprint from union
         result = super(Fingerprint, type(self)).__new__(type(self), union)
         # Set n_flows to combination of self and other
-        result.__setattr__('n_flows', self.n_flows + sum(o.n_flows for o in other))
+        result.__setattr__("n_flows", self.n_flows + sum(o.n_flows for o in other))
         # Return result
         return result
 
@@ -84,10 +79,6 @@ class Fingerprint(frozenset):
             """
         return len(self & other) / max(len(self | other), 1)
 
-    ########################################################################
-    #                              Attributes                              #
-    ########################################################################
-
     @property
     def destinations(self):
         """(IP, port) destination tuples in fingerprint"""
@@ -96,11 +87,7 @@ class Fingerprint(frozenset):
     @property
     def certificates(self):
         """Certificates in fingerprint"""
-        return sorted([x  for x in self if not isinstance(x, tuple)])
-
-    ########################################################################
-    #                            I/O functions                             #
-    ########################################################################
+        return sorted([x for x in self if not isinstance(x, tuple)])
 
     def to_dict(self):
         """Return fingerprint as dictionary object
@@ -111,12 +98,13 @@ class Fingerprint(frozenset):
                 Fingerprint as dictionary, may be used for JSON export
             """
         return {
-            'certificates': self.certificates,
-            'destinations': self.destinations,
-            'n_flows': self.n_flows,
+            "certificates": self.certificates,
+            "destinations": self.destinations,
+            "n_flows": self.n_flows,
         }
 
-    def from_dict(self, dictionary):
+    @classmethod
+    def from_dict(cls, dictionary):
         """Load fingerprint from dictionary object
 
             Parameters
@@ -133,18 +121,13 @@ class Fingerprint(frozenset):
                 Fingerprint object as read from dictionary
             """
         # Get destinations and certificates from dictionary
-        dsts  = set([tuple(x) for x in dictionary.get('destinations', [])])
-        certs = set([      x  for x in dictionary.get('certificates', [])])
+        dsts = set([tuple(x) for x in dictionary.get("destinations", [])])
+        certs = set([x for x in dictionary.get("certificates", [])])
         # Create frozenset of destination identifiers
-        self = super(Fingerprint, type(self)).__new__(type(self), dsts | certs)
+        self = super().__new__(cls, dsts | certs)
         # Set number of flows
-        self.__setattr__('n_flows', dictionary.get('n_flows', 0))
-        # Return self
+        self.__setattr__("n_flows", dictionary.get("n_flows", 0))
         return self
-
-    ########################################################################
-    #                              Overrides                               #
-    ########################################################################
 
     def __lt__(self, other):
         return (len(self), self.n_flows) < (len(other), other.n_flows)
@@ -158,9 +141,5 @@ class Fingerprint(frozenset):
         # Else return destination & certificate hash
         return hash(frozenset([x for x in self]))
 
-    ########################################################################
-    #                        String representation                         #
-    ########################################################################
-
     def __str__(self):
-        return "Fingerprint({}) [size={:4}]".format(hex(id(self)), len(self))
+        return f"Fingerprint({hex(id(self))}) [size={len(self):4}]"

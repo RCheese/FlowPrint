@@ -1,10 +1,12 @@
 from collections import Counter
-from itertools   import combinations
+from itertools import combinations
 import json
-import networkx  as nx
 import warnings
 
-class CrossCorrelationGraph(object):
+import networkx as nx
+
+
+class CrossCorrelationGraph:
     """CrossCorrelationGraph for computing correlation between clusters
 
         Attributes
@@ -53,10 +55,10 @@ class CrossCorrelationGraph(object):
                 Threshold for the minimum required correlation
             """
         # Set parameters
-        self.window       = window
-        self.correlation  = correlation
-        self.mapping      = dict()
-        self.graph        = nx.Graph()
+        self.window = window
+        self.correlation = correlation
+        self.mapping = dict()
+        self.graph = nx.Graph()
 
     def fit(self, cluster, y=None):
         """Fit Cross Correlation Graph.
@@ -76,24 +78,14 @@ class CrossCorrelationGraph(object):
         # Compute cross correlations within cluster
         correlations, self.mapping = self.cross_correlation(cluster)
 
-        # In case of correlation <= 0
-        if self.correlation <= 0:
-            # Create a fully connected graph
+        if self.correlation <= 0:  # Create a fully connected graph
             self.graph = nx.complete_graph(list(self.mapping.keys()))
-
-        # In case of correlation > 0
         else:
-            # Create graph
             self.graph = nx.Graph()
-
-            # Add nodes of graph
             self.graph.add_nodes_from(list(self.mapping.keys()))
-            # Add edges of graph
             for (u, v), weight in correlations.items():
                 if weight >= self.correlation:
                     self.graph.add_edge(u, v, weight=weight)
-
-        # Return self for fit predict method
         return self
 
     def predict(self, X=None, y=None):
@@ -110,9 +102,7 @@ class CrossCorrelationGraph(object):
             result : Generator of cliques
                 Generator of all cliques in the graph
             """
-        # Get cliques
         cliques = nx.find_cliques(self.graph)
-        # Return generator over cliques
         return (set.union(*[self.mapping.get(n) for n in c]) for c in cliques)
 
     def fit_predict(self, cluster, y=None):
@@ -130,13 +120,9 @@ class CrossCorrelationGraph(object):
             result : Generator of cliques
                 Generator of all cliques in the graph
             """
-        # Perform fit and predict
         return self.fit(cluster).predict(cluster)
 
-    ########################################################################
-    #                                Export                                #
-    ########################################################################
-    def export(self, outfile, dense=True, format='gexf'):
+    def export(self, outfile, dense=True, format="gexf"):
         """Export CrossCorrelationGraph to outfile for further analysis
 
             Parameters
@@ -159,62 +145,47 @@ class CrossCorrelationGraph(object):
                 supported.
             """
         if dense:
-            # Get graph
             graph = self.graph
 
             # Initialise human-readable mapping of nodes
             mapping = dict()
             # Fill mapping
             for node in graph:
-                # Initialise info
                 info = {
-                    'window': list(sorted(node)),
-                    'ips'   : set(),
-                    'certs' : set(),
-                    'labels': Counter(),
+                    "window": list(sorted(node)),
+                    "ips": set(),
+                    "certs": set(),
+                    "labels": Counter(),
                 }
                 # Loop over corresponding network destinations
                 for destination in self.mapping.get(node):
-                    info['ips'   ] = info.get('ips'   , set())     |\
-                                     destination.destinations
-                    info['certs' ] = info.get('certs' , set())     |\
-                                     destination.certificates
-                    info['labels'] = info.get('labels', Counter()) +\
-                                     destination.labels
+                    info["ips"] = info.get("ips", set()) | destination.destinations
+                    info["certs"] = info.get("certs", set()) | destination.certificates
+                    info["labels"] = info.get("labels", Counter()) + destination.labels
 
                 # Remove None from certificates
-                info['certs'] = info.get('certs', set()) - {None}
+                info["certs"] = info.get("certs", set()) - {None}
                 # Transform sets into lists
-                info['ips'  ] = list(info.get('ips'  , set()))
-                info['certs'] = list(info.get('certs', set()))
+                info["ips"] = list(info.get("ips", set()))
+                info["certs"] = list(info.get("certs", set()))
 
                 # Store mapping as text
                 mapping[node] = json.dumps(info, sort_keys=True)
 
-            # Relabel nodes
             graph = nx.relabel_nodes(graph, mapping)
 
         # Make graph not dense
         else:
-            # Initialise non-dense graph
             graph = nx.Graph()
-
-            # Fill non-dense graph with nodes
             for node in self.graph:
-                # Loop over network destinations for each node in graph
                 for destination in self.mapping.get(node):
-                    # Add destination as a separate node
                     graph.add_node(destination)
 
-            # Fill non-dense graph with edges
             for node in self.graph:
-                # Loop over network destinations for each node in graph
                 for source in self.mapping.get(node):
-                    # Add all edges in between nodes
                     for destination in self.mapping.get(node):
-                        # No self-loops
-                        if source == destination: continue
-                        # Add all source-destination edges
+                        if source == destination:
+                            continue
                         graph.add_edge(source, destination, weight=1)
 
                     # Add all edges to other nodes
@@ -226,42 +197,30 @@ class CrossCorrelationGraph(object):
                             graph.add_edge(source, destination, data=data)
 
             # Transform network destinations to human readable format
-            # Initialise mapping
             mapping = dict()
-            # Loop over all nodes in graph
             for node in self.graph:
-                # Loop over network destinations for each node in graph
                 for destination in self.mapping.get(node):
-                    # Initialise info
                     info = {
-                        'window': list(sorted(node)),
-                        'ips'   : list(destination.destinations),
-                        'certs' : list(destination.certificates - {None}),
-                        'labels': destination.labels,
+                        "window": list(sorted(node)),
+                        "ips": list(destination.destinations),
+                        "certs": list(destination.certificates - {None}),
+                        "labels": destination.labels,
                     }
 
-                    # Store mapping as text
                     mapping[destination] = json.dumps(info, sort_keys=True)
 
-            # Relabel nodes
             graph = nx.relabel_nodes(graph, mapping)
 
         # Export graph to file
-        if format.lower() == 'gexf':
+        if format.lower() == "gexf":
             nx.write_gexf(graph, outfile)
-        elif format.lower() == 'gml':
+        elif format.lower() == "gml":
             nx.write_gml(graph, outfile)
         else:
             # Warn user of unknown format
-            warnings.warn("Unknown export format '{}', defaulting to 'gexf'"
-                          .format(format))
+            warnings.warn(f"Unknown export format '{format}', defaulting to 'gexf'")
             # Export as gexf
             nx.write_gexf(graph, outfile)
-
-
-    ########################################################################
-    #                      Compute cross correlation                       #
-    ########################################################################
 
     def cross_correlation(self, cluster):
         """Compute cross correlation between clusters
@@ -280,7 +239,6 @@ class CrossCorrelationGraph(object):
             mapping : dict
                 Mapping of activity fingerprint -> clusters
             """
-        # Initialise correlation
         correlation = dict()
 
         # Get activity of samples
@@ -288,21 +246,17 @@ class CrossCorrelationGraph(object):
         # Get inverted mapping
         mapping = dict()
         for destination, active in activity.items():
-            mapping[frozenset(active)] =\
-                mapping.get(frozenset(active), set()) | set([destination])
+            mapping[frozenset(active)] = mapping.get(frozenset(active), set()) | set(
+                [destination]
+            )
 
         # Compute cross correlation values
         for x, y in combinations(mapping, 2):
-            # Compute cardinality of union
             union = len(x & y)
-            # If a union exists add correlation
             if union:
-                # Compute intersection
                 intersection = len(x | y)
-                # Add correlation
                 correlation[x, y] = union / intersection
 
-        # Return result
         return correlation, mapping
 
     def activity(self, cluster):
@@ -318,27 +272,17 @@ class CrossCorrelationGraph(object):
             mapping : dict
                 Dictionary of NetworkDestination -> activity
             """
-        # Get samples
         X = cluster.samples
-        # Compute start time
         start = min(x.time_start for x in X)
 
         # Initialise mapping of NetworkDestination -> activity
         mapping = dict()
 
-        # Loop over all network destinations
         for destination in cluster.clusters():
-            # Loop over each flow in destination
             for flow in destination.samples:
-                # Compute activity per flow
                 activity = set()
-                # Loop over all timestamps
                 for timestamp in flow.timestamps:
-                    # Compute activity for each timestamp
                     activity.add(int((timestamp - start) // self.window))
-
-                # Add activity to mapping
                 mapping[destination] = mapping.get(destination, set()) | activity
 
-        # Return activity mapping
         return mapping

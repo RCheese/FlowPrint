@@ -2,30 +2,52 @@ import argparse
 import os
 import numpy as np
 
-from flowprint.preprocessor             import Preprocessor
-from flowprint.cluster                  import Cluster
-from flowprint. cross_correlation_graph import CrossCorrelationGraph
+from flowprint.preprocessor import Preprocessor
+from flowprint.cluster import Cluster
+from flowprint.cross_correlation_graph import CrossCorrelationGraph
 
 if __name__ == "__main__":
     ########################################################################
     #                             Handle input                             #
     ########################################################################
     # Parse input
-    parser = argparse.ArgumentParser("FlowPrint CrossCorrelationGraph export example", formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('--files'      , nargs='+', help='files to use as input')
-    parser.add_argument('--dir'        , help='directory containing files to use as input')
-    parser.add_argument('-b', '--batch'      , type=float, default=float('inf'), help='batch size in seconds creates separate cross correlation graph per batch (default=inf)')
-    parser.add_argument('-c', '--correlation', type=float, default=0.1,          help='cross-correlation threshold,  used for cross correlation graph           (default=0.1)')
-    parser.add_argument('-w', '--window'     , type=float, default=30 ,          help='window size in seconds     ,  used for cross correlation graph           (default= 30)')
+    parser = argparse.ArgumentParser(
+        "FlowPrint CrossCorrelationGraph export example",
+        formatter_class=argparse.RawTextHelpFormatter,
+    )
+    parser.add_argument("--files", nargs="+", help="files to use as input")
+    parser.add_argument("--dir", help="directory containing files to use as input")
+    parser.add_argument(
+        "-b",
+        "--batch",
+        type=float,
+        default=float("inf"),
+        help="batch size in seconds creates separate cross correlation graph per batch (default=inf)",
+    )
+    parser.add_argument(
+        "-c",
+        "--correlation",
+        type=float,
+        default=0.1,
+        help="cross-correlation threshold,  used for cross correlation graph           (default=0.1)",
+    )
+    parser.add_argument(
+        "-w",
+        "--window",
+        type=float,
+        default=30,
+        help="window size in seconds     ,  used for cross correlation graph           (default= 30)",
+    )
     args = parser.parse_args()
 
     # Check if arguments were given
-    if (args.files is None and args.dir is None) or\
-       (args.files is not None and args.dir is not None):
+    if (args.files is None and args.dir is None) or (
+        args.files is not None and args.dir is not None
+    ):
         raise ValueError("Please specify either --files or --dir but not both.")
 
     # Get file names
-    files = args.files or [args.dir+x for x in os.listdir(args.dir)]
+    files = args.files or [args.dir + x for x in os.listdir(args.dir)]
 
     ########################################################################
     #                              Read data                               #
@@ -46,9 +68,7 @@ if __name__ == "__main__":
     sort_batch = np.array([x.time_start for x in X])
     # Compute number of required batches
     if sort_batch.shape[0]:
-        batches = int(
-            np.ceil((max(sort_batch) - min(sort_batch)) / args.batch)
-        )
+        batches = int(np.ceil((max(sort_batch) - min(sort_batch)) / args.batch))
     else:
         batches = 0
     # Get edges of batches
@@ -73,8 +93,7 @@ if __name__ == "__main__":
 
         # Create CrossCorrelationGraph from cluster
         ccg = CrossCorrelationGraph(
-            window      = args.window,
-            correlation = args.correlation
+            window=args.window, correlation=args.correlation
         ).fit(cluster)
 
         ################################################################
@@ -82,4 +101,4 @@ if __name__ == "__main__":
         ################################################################
 
         # Export CrossCorrelationGraph for each batch
-        ccg.export('test_batch_{}.gexf'.format(i), dense=True, format='gexf')
+        ccg.export("test_batch_{}.gexf".format(i), dense=True, format="gexf")

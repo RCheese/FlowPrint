@@ -1,22 +1,14 @@
 import itertools
 import json
+
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 
-try:
-    from .network_destination import NetworkDestination
-except:
-    try:
-        from network_destination import NetworkDestination
-    except Exception as e:
-        raise ValueError(e)
+from .network_destination import NetworkDestination
 
-################################################################################
-#         Cluster object for clustering flows per network destination          #
-################################################################################
 
-class Cluster(object):
+class Cluster:
     """Cluster object for clustering flows by network destination
 
         Attributes
@@ -42,23 +34,13 @@ class Cluster(object):
             load : string, default=None
                 If given, load cluster from json file from 'load' path.
             """
-        # Set samples
         self.samples = np.zeros((0))
-
-        # Initialise counter
         self.counter = 0
-
-        # Dictionaries of destination identifiers -> cluster
         self.dict_destination = dict()
         self.dict_certificate = dict()
 
-        # Load cluster if necessary
         if load is not None:
             self.load(load)
-
-    ########################################################################
-    #                       Fit & prediction methods                       #
-    ########################################################################
 
     def fit(self, X, y=None):
         """Fit the clustering algorithm with flow samples X.
@@ -76,12 +58,9 @@ class Cluster(object):
             result : self
                 Returns self
             """
-        # Add X to samples
         self.samples = np.concatenate((self.samples, X))
-        # Set y to empty if None
         y = np.zeros(len(X)) if y is None else y
 
-        # Loop over all samples in X
         for sample, label in zip(X, y):
 
             # Extract values
@@ -89,8 +68,10 @@ class Cluster(object):
             destination = sample.destination
 
             # Get the number of matching clusters
-            clusters = [self.dict_certificate.get(certificate),
-                        self.dict_destination.get(destination)]
+            clusters = [
+                self.dict_certificate.get(certificate),
+                self.dict_destination.get(destination),
+            ]
 
             # Case 1: Multiple matches
             # Check for multiple matching slices
@@ -103,7 +84,6 @@ class Cluster(object):
 
                 # Case 1b: Destination and certificate -> different clusters
                 else:
-                    # Create new cluster
                     cluster = self.new_cluster()
                     # For each match
                     for c in clusters:
@@ -132,7 +112,6 @@ class Cluster(object):
             if destination is not None:
                 self.dict_destination[destination] = cluster
 
-        # Return result
         return self
 
     def predict(self, X):
@@ -167,9 +146,10 @@ class Cluster(object):
                 if no cluster could be matched.
             """
         # Get matching cluster or -1
-        return self.dict_destination.get(X.destination,
-               self.dict_certificate.get(X.certificate,
-               NetworkDestination(-1))).identifier
+        return self.dict_destination.get(
+            X.destination,
+            self.dict_certificate.get(X.certificate, NetworkDestination(-1)),
+        ).identifier
 
     def fit_predict(self, X):
         """Fit and predict cluster with given samples.
@@ -212,7 +192,7 @@ class Cluster(object):
             result : set
                 Set of NetworkDestinations in cluster.
             """
-        clusters  = set(self.dict_certificate.values())
+        clusters = set(self.dict_certificate.values())
         clusters |= set(self.dict_destination.values())
         return clusters
 
@@ -242,9 +222,8 @@ class Cluster(object):
         output = {"samples": self.samples.tolist()}
 
         # Write to json file
-        with open(outfile, 'w') as outfile:
+        with open(outfile, "w") as outfile:
             json.dump(output, outfile)
-
 
     def load(self, infile):
         """Loads cluster object from json file.
@@ -254,8 +233,8 @@ class Cluster(object):
             infile : string
                 Path to json file from which to load the cluster object.
             """
-        with open(infile, 'r') as infile:
-            result  = json.load(infile)
+        with open(infile, "r") as infile:
+            result = json.load(infile)
             samples = np.asarray(result.get("samples"))
             self.fit(samples)
 
@@ -276,11 +255,6 @@ class Cluster(object):
         # Return result
         return result
 
-
-    ########################################################################
-    #                             Plot methods                             #
-    ########################################################################
-
     def plot(self, annotate=False):
         """Plot cluster NetworkDestinations.
 
@@ -290,49 +264,33 @@ class Cluster(object):
                 If True, annotate each cluster
             """
         # Get clusters
-        clusters = [c.get_description()    for c in self.clusters()]
-        sizes    = [20*len(c.samples)**0.7 for c in self.clusters()]
+        clusters = [c.get_description() for c in self.clusters()]
+        sizes = [20 * len(c.samples) ** 0.7 for c in self.clusters()]
 
         # Create complete graph from clusters
         graph = nx.Graph()
         graph.add_nodes_from(clusters)
         graph.add_edges_from(itertools.combinations(clusters, 2))
 
-        # Draw graph
-        nx.draw_spring(graph,
-            alpha=0.7,              # see through nodes
-            edgelist    = list(),   # don't show edges
-            node_size   = sizes,    # set node sizes
-            with_labels = annotate, # don't show labels
+        nx.draw_spring(
+            graph,
+            alpha=0.7,  # see through nodes
+            edgelist=list(),  # don't show edges
+            node_size=sizes,  # set node sizes
+            with_labels=annotate,  # don't show labels
         )
 
-        # Plot graph
         plt.show()
 
-
-    ########################################################################
-    #                            String method                             #
-    ########################################################################
-
     def __str__(self):
-        """Returns string representation of self."""
-        # Get all clusters as a set
         clusters = self.clusters()
-
-        # Get predictions
         preds = self.predict(self.samples)
-
-        # Return string
-        return """Cluster
+        return f"""Cluster
 ---------------------------------
-  Flow samples                : {:>}
-  Unique Network Destinations : {:>}
-  Unique labels               : {:>}
+  Flow samples                : {self.samples.shape[0]:>}
+  Unique Network Destinations : {len(clusters):>}
+  Unique labels               : {np.unique(preds[preds != -1]).shape[0]:>}
   -------------------------------
-  Unique certificates         : {}
-  Unique ip destinations      : {}""".format(
-    self.samples.shape[0],
-    len(clusters),
-    np.unique(preds[preds != -1]).shape[0],
-    len(self.dict_certificate),
-    len(self.dict_destination))
+  Unique certificates         : {len(self.dict_certificate)}
+  Unique ip destinations      : {len(self.dict_destination)}
+"""

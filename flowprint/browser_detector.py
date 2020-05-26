@@ -1,17 +1,11 @@
-from sklearn.ensemble import RandomForestClassifier
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
 
-try:
-    from .cluster import Cluster
-except:
-    try:
-        from cluster import Cluster
-    except Exception as e:
-        raise ValueError(e)
+from .cluster import Cluster
 
 
-class BrowserDetector(object):
+class BrowserDetector:
     """Detector for browser application
 
         Attributes
@@ -43,17 +37,11 @@ class BrowserDetector(object):
                 number generator; If None, the random number generator is the
                 RandomState instance used by `np.random`
             """
-        # Initialise classifier
         self.classifier = RandomForestClassifier(
             n_estimators=10, random_state=random_state
         )
-        # Initialise before and after seconds
         self.before = before
-        self.after  = after
-
-    ########################################################################
-    #                         Fit/Predict methods                          #
-    ########################################################################
+        self.after = after
 
     def fit(self, X, y):
         """Fit the classifier with browser and non-browser traffic
@@ -92,34 +80,26 @@ class BrowserDetector(object):
                 -1 if sample from X is not from browser, 1 if sample from X is
                 from browser
             """
-        # Get prediction from Random Forest
         predictions = self.classifier.predict(self.features(X))
 
-        ################################################################
-        #       Label temporally close flows as browser as well        #
-        ################################################################
+        timestamps = np.asarray([x.time_start for x in X])
 
-        # Get timestamps from flows
-        timestamps  = np.asarray([x.time_start for x in X])
-
-        # Loop over all predictions
         for i, prediction in enumerate(predictions):
             # Check if we found a browser
             if prediction == 1:
-                # Get timestamp
                 ts = timestamps[i]
                 # Set previous and future timestamps
                 for j in range(i, 0, -1):
                     predictions[j] = max(predictions[j], 0)
-                    if timestamps[j] < ts-self.before: break
+                    if timestamps[j] < ts - self.before:
+                        break
                 for j in range(i, timestamps.shape[0]):
                     predictions[j] = max(predictions[j], 0)
-                    if timestamps[j] > ts+self.after: break
+                    if timestamps[j] > ts + self.after:
+                        break
 
-        # Set detected by timeframe to -1
         predictions[predictions == 0] = -1
 
-        # Return result
         return predictions
 
     def fit_predict(self, X, y):
@@ -142,12 +122,6 @@ class BrowserDetector(object):
             """
         return self.fit(X, y).predict(X)
 
-
-
-    ########################################################################
-    #                          Feature extraction                          #
-    ########################################################################
-
     def features(self, X):
         """Returns flow features for determining whether flows are browser
 
@@ -166,31 +140,35 @@ class BrowserDetector(object):
             """
         print("Creating features")
         # Compute dataframe of flow features
-        df = pd.DataFrame({
-            'outgoing' : [ sum(y for y in x.lengths if y > 0) for x in X],
-            'incoming' : [-sum(y for y in x.lengths if y < 0) for x in X],
-            'cluster'  : Cluster().fit_predict(X)
-        }, index=pd.to_datetime([x.time_start for x in X], unit='s')
+        df = pd.DataFrame(
+            {
+                "outgoing": [sum(y for y in x.lengths if y > 0) for x in X],
+                "incoming": [-sum(y for y in x.lengths if y < 0) for x in X],
+                "cluster": Cluster().fit_predict(X),
+            },
+            index=pd.to_datetime([x.time_start for x in X], unit="s"),
         ).sort_index()
 
         # Compute features as rolling changes
-        cluster  = df['cluster' ].rolling('5s').apply(
-            lambda x: np.unique(x).shape[0], raw=True).values
-        incoming = df['incoming'].rolling('5s').apply(np.mean, raw=True).values
-        outgoing = df['outgoing'].rolling('5s').apply(np.mean, raw=True).values
+        cluster = (
+            df["cluster"]
+            .rolling("5s")
+            .apply(lambda x: np.unique(x).shape[0], raw=True)
+            .values
+        )
+        incoming = df["incoming"].rolling("5s").apply(np.mean, raw=True).values
+        outgoing = df["outgoing"].rolling("5s").apply(np.mean, raw=True).values
 
         # Compute derivatives
-        cluster  = np.concatenate(([0], np.diff(cluster)))
+        cluster = np.concatenate(([0], np.diff(cluster)))
         incoming = np.concatenate(([0], np.diff(incoming)))
         outgoing = np.concatenate(([0], np.diff(outgoing)))
-        ratio    = incoming/outgoing
+        ratio = incoming / outgoing
 
-        # To numpy array
         result = np.asarray([cluster, incoming, outgoing, ratio]).T
         # Impute NaN
-        result[np.isnan(result)       ] = 0
-        result[result ==  float('inf')] = 0
-        result[result == -float('inf')] = 0
+        result[np.isnan(result)] = 0
+        result[result == float("inf")] = 0
+        result[result == -float("inf")] = 0
 
-        # Return result
         return result
